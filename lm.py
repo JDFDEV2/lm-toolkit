@@ -16,7 +16,25 @@ import os
 import json
 import argparse
 import subprocess
+import time
+from datetime import datetime, timezone
 from pathlib import Path
+
+LOG_FILE = Path.home() / ".lm-toolkit" / "usage.log"
+
+
+def log_usage(mode: str, prompt: str, model: str, elapsed: float, chars: int) -> None:
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "ts":      datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "mode":    mode,
+        "model":   model,
+        "elapsed": round(elapsed, 1),
+        "chars":   chars,
+        "prompt":  prompt[:120].replace("\n", " "),
+    }
+    with LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
 
 try:
     import requests
@@ -94,6 +112,7 @@ def call_lm(prompt: str, system_context: str, model: str, stream: bool = True) -
         payload["system"] = system_context
 
     collected = []
+    t0 = time.monotonic()
 
     if stream:
         with requests.post(
@@ -119,16 +138,18 @@ def call_lm(prompt: str, system_context: str, model: str, stream: bool = True) -
                 except (json.JSONDecodeError, KeyError):
                     pass
         print()  # final newline
-        return "".join(collected)
+        result = "".join(collected)
     else:
         r = requests.post(
             f"{LEMONADE_URL}/v1/chat/completions",
             json=payload, timeout=180
         )
         r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"]
-        print(content)
-        return content
+        result = r.json()["choices"][0]["message"]["content"]
+        print(result)
+
+    log_usage("chat", prompt[:120], model, time.monotonic() - t0, len(result))
+    return result
 
 
 # ── task modes ─────────────────────────────────────────────────────────────────
@@ -142,6 +163,7 @@ def mode_commit(model: str, context: str) -> None:
         print("[lm] No staged changes. Run: git add <files>", file=sys.stderr)
         sys.exit(1)
 
+    t0 = time.monotonic()
     prompt = (
         "Generate a concise git commit message for the following staged diff.\n"
         "Format: one short subject line (≤72 chars), then a blank line, then bullet points "
@@ -149,6 +171,7 @@ def mode_commit(model: str, context: str) -> None:
         f"```diff\n{diff.stdout[:8000]}\n```"
     )
     message = call_lm(prompt, context, model, stream=False)
+    log_usage("commit", "git diff --staged", model, time.monotonic() - t0, len(message))
 
     confirm = input("\n[lm] Commit with this message? [y/N] ").strip().lower()
     if confirm == "y":
@@ -182,6 +205,7 @@ def mode_readme(model: str, context: str) -> None:
             print("[lm] Aborted.")
             return
 
+    log_usage("readme", f"generate README for {cwd.name}", model, 0, len(readme_content))
     out.write_text(readme_content, encoding="utf-8")
     print(f"[lm] Written to {out}")
 

@@ -85,6 +85,14 @@ EOF
 chmod +x "$BIN_DIR/lm-delegate"
 ok "lm-delegate → $SCRIPT_DIR/delegate.py"
 
+# log viewer
+cat > "$BIN_DIR/lm-log" << EOF
+#!/usr/bin/env bash
+exec $PYTHON "$SCRIPT_DIR/log.py" "\$@"
+EOF
+chmod +x "$BIN_DIR/lm-log"
+ok "lm-log → $SCRIPT_DIR/log.py"
+
 # PATH reminder
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   warn "$BIN_DIR is not in your PATH. Add this to ~/.bashrc:"
