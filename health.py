@@ -16,7 +16,7 @@ except ImportError:
     sys.exit(1)
 
 LEMONADE_URL  = os.getenv("LEMONADE_URL", "http://localhost:8000")
-TARGET_MODEL  = os.getenv("LM_MODEL", "Llama-3.2-3B-Hybrid")
+TARGET_MODEL  = os.getenv("LM_MODEL", "Qwen2.5-3B-Instruct-FLM")
 
 
 def check() -> bool:
